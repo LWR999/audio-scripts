@@ -6,6 +6,7 @@ verbose=false
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
+YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 # Function to display help
@@ -81,6 +82,7 @@ fi
 # Initialize counters and arrays
 processed_count=0
 error_count=0
+skipped_count=0
 moved_to_hires=0
 moved_to_cd=0
 declare -A quality_map
@@ -88,8 +90,20 @@ declare -A quality_map
 # Check for empty counters and set defaults
 : ${processed_count:=0}
 : ${error_count:=0}
+: ${skipped_count:=0}
 : ${moved_to_hires:=0}
 : ${moved_to_cd:=0}
+
+# Function to check if directory contains FLAC files
+has_flac_files() {
+  local dir_path="$1"
+  # Check if directory contains any .flac files (case-insensitive)
+  if find "$dir_path" -maxdepth 1 -type f -iname "*.flac" | grep -q .; then
+    return 0  # true - has FLAC files
+  else
+    return 1  # false - no FLAC files
+  fi
+}
 
 # Function to extract genre from directory name
 extract_genre() {
@@ -165,6 +179,16 @@ for dir in "$root_dir"/*; do
     
     # Check if directory name matches artist-album pattern
     if [[ "$dir_name" == *" - "* ]]; then
+      echo -e "${BLUE}Checking directory: $dir_name${NC}"
+      
+      # Check if directory contains FLAC files
+      if ! has_flac_files "$dir"; then
+        echo -e "${YELLOW}WARNING: Directory '$dir_name' contains no FLAC files - skipping processing${NC}"
+        ((skipped_count++))
+        echo "-------------------------------------------"
+        continue
+      fi
+      
       echo -e "${BLUE}Processing directory: $dir_name${NC}"
       
       # Extract genre from directory name or use default
@@ -276,6 +300,7 @@ echo -e "${GREEN}Processing complete${NC}"
 echo "-------------------------------------------"
 echo "Total directories processed: ${processed_count:-0}"
 echo "Directories with errors: ${error_count:-0}"
+echo "Directories skipped (no FLAC files): ${skipped_count:-0}"
 if $has_cd_hires_dirs; then
   echo "Moved to _Hires: ${moved_to_hires:-0}"
   echo "Moved to _CD: ${moved_to_cd:-0}"
